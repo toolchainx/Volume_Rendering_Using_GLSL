@@ -32,7 +32,7 @@ GLuint g_rcVertHandle;
 GLuint g_rcFragHandle;
 GLuint g_bfVertHandle;
 GLuint g_bfFragHandle;
-float g_stepSize = 0.01f;
+float g_stepSize = 0.001f;
 
 
 int checkForOpenGLError(const char* file, int line)
@@ -57,20 +57,19 @@ void initVBO();
 void initShader();
 void initFrameBuffer(GLuint, GLuint, GLuint);
 GLuint initTFF1DTex(const char* filename);
-GLuint initFace2DTex();
+GLuint initFace2DTex(GLuint texWidth, GLuint texHeight);
 GLuint initVol3DTex(const char* filename, GLuint width, GLuint height, GLuint depth);
 void render(GLenum cullFace);
 void init()
 {
+    g_texWidth = g_winWidth;
+    g_texHeight = g_winHeight;
     initVBO();
     initShader();
     g_tffTexObj = initTFF1DTex("tff.dat");
-    g_bfTexObj = initFace2DTex();
-    g_volTexObj = initVol3DTex("head256.raw", 256, 256, 225
-);
+    g_bfTexObj = initFace2DTex(g_texWidth, g_texHeight);
+    g_volTexObj = initVol3DTex("head256.raw", 256, 256, 225);
     GL_ERROR();
-    g_texWidth = g_winWidth;
-    g_texHeight = g_winHeight;
     initFrameBuffer(g_bfTexObj, g_texWidth, g_texHeight);
     GL_ERROR();
 }
@@ -260,6 +259,7 @@ GLuint initTFF1DTex(const char* filename)
     {
 	size_t bytecnt = inFile.gcount();
 	*(tff + bytecnt) = '\0';
+	cout << "bytecnt " << bytecnt << endl;
     }
     else if(inFile.fail())
     {
@@ -275,12 +275,13 @@ GLuint initTFF1DTex(const char* filename)
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA8, 256, 0, GL_RGBA, GL_UNSIGNED_BYTE, tff);
     free(tff);    
     return tff1DTex;
 }
 // 初始化2D纹理对象
-GLuint initFace2DTex()
+GLuint initFace2DTex(GLuint bfTexWidth, GLuint bfTexHeight)
 {
     GLuint backFace2DTex;
     glGenTextures(1, &backFace2DTex);
@@ -289,7 +290,7 @@ GLuint initFace2DTex()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, 512, 512, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, bfTexWidth, bfTexHeight, 0, GL_RGBA, GL_FLOAT, NULL);
     return backFace2DTex;
 }
 // init 3D texture
@@ -321,7 +322,6 @@ GLuint initVol3DTex(const char* filename, GLuint w, GLuint h, GLuint d)
 
     glGenTextures(1, &g_volTexObj);
     // bind 3D texture target
-    glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_3D, g_volTexObj);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);	
 // 启用三线性过滤，以得到更加清晰的图像
@@ -346,8 +346,6 @@ void checkFramebufferStatus()
 	cout << "framebuffer is not complete" << endl;
 	exit(EXIT_FAILURE);
     }
-    
-
 }
 // 初始化framebuffer
 void initFrameBuffer(GLuint texObj, GLuint texWidth, GLuint texHeight)
@@ -356,7 +354,7 @@ void initFrameBuffer(GLuint texObj, GLuint texWidth, GLuint texHeight)
     GLuint depthBuffer;
     glGenRenderbuffers(1, &depthBuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, texWidth, texHeight);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, texWidth, texHeight);
 
     // attach the texture and the depth buffer to the framebuffer
     glGenFramebuffers(1, &g_frameBuffer);
@@ -369,9 +367,21 @@ void initFrameBuffer(GLuint texObj, GLuint texWidth, GLuint texHeight)
 
 void rcSetUinforms()
 {
+    // setting the screensize
     // 设置步长
     // 背面纹理
     // 体纹理
+    GLint screenSizeLoc = glGetUniformLocation(g_programHandle, "ScreenSize");
+    if (screenSizeLoc >= 0)
+    {
+	glUniform2f(screenSizeLoc, (float)g_winWidth, (float)g_winHeight);
+    }
+    else
+    {
+	cout << "ScreenSize"
+	     << "is not bind to the uniform"
+	     << endl;
+    }
     GLint stepSizeLoc = glGetUniformLocation(g_programHandle, "StepSize");
     GL_ERROR();
     if (stepSizeLoc >= 0)
@@ -448,8 +458,8 @@ void linkShader(GLuint shaderPgm, GLuint newVertHandle, GLuint newFragHandle)
     GLsizei count;
     GLuint shaders[maxCount];
     glGetAttachedShaders(shaderPgm, maxCount, &count, shaders);
-    cout << "get VertHandle: " << shaders[0] << endl;
-    cout << "get FragHandle: " << shaders[1] << endl;
+    // cout << "get VertHandle: " << shaders[0] << endl;
+    // cout << "get FragHandle: " << shaders[1] << endl;
     GL_ERROR();
     for (int i = 0; i < count; i++) {
 	glDetachShader(shaderPgm, shaders[i]);
@@ -498,14 +508,19 @@ void display()
     render(GL_BACK);
     // 恢复使用单个纹理
     glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, 0);
     glDisable(GL_TEXTURE_2D);
     glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_3D, 0);    
     glDisable(GL_TEXTURE_3D);
     glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_1D, 0);    
     glDisable(GL_TEXTURE_1D);
     glActiveTexture(GL_TEXTURE0);
     glUseProgram(0);
-    GL_ERROR();    
+    GL_ERROR(); 
+    
+    // // for test
     // glBindFramebuffer(GL_READ_FRAMEBUFFER, g_frameBuffer);
     // checkFramebufferStatus();
     // glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
@@ -528,7 +543,7 @@ void render(GLenum cullFace)
     glClearColor(0.2f,0.2f,0.2f,1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     //  transform the box
-    glm::mat4 projection = glm::perspective(60.0f, (GLfloat)g_winWidth/g_winHeight, 0.1f, 100.f);
+    glm::mat4 projection = glm::perspective(60.0f, (GLfloat)g_winWidth/g_winHeight, 0.1f, 400.f);
     glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.0f, 2.0f),
     				 glm::vec3(0.0f, 0.0f, 0.0f), 
     				 glm::vec3(0.0f, 1.0f, 0.0f));
@@ -580,7 +595,7 @@ int main(int argc, char** argv)
 {
     
     glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
     glutCreateWindow("GLUT Test");
     glutInitWindowSize(400, 400);
     GLenum err = glewInit();
