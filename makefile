@@ -3,8 +3,8 @@ OFLAG = -o
 CFLAGS = -c -Wall -g -DDEBUG
 LIB = -lglew32 -lfreeglut64 -lopengl32 -lglu32
 WIN_GUI_FLAG = -Wl,--subsystem,windows
-LIB_DIR = -L"d:\MinGW\include\freeglut\lib" -L"D:\MinGW\include\glew\lib"
-INC_DIR = -I"d:\MinGW\include\freeglut\include" -I"D:\MinGW\include\glew\include"
+LIB_DIR = -L"./lib"
+INC_DIR = -I"./include"
 
 
 all: main.o

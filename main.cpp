@@ -22,7 +22,7 @@ GLuint g_winWidth = 400;
 GLuint g_winHeight = 400;
 GLint g_angle = 0;
 GLuint g_frameBuffer;
-// 传输函数
+// transfer function
 GLuint g_tffTexObj;
 GLuint g_bfTexObj;
 GLuint g_texWidth;
@@ -73,7 +73,7 @@ void init()
     initFrameBuffer(g_bfTexObj, g_texWidth, g_texHeight);
     GL_ERROR();
 }
-// 初始化顶点缓冲区对象
+// init the vertex buffer object
 void initVBO()
 {
     GLfloat vertices[24] = {
@@ -86,8 +86,8 @@ void initVBO()
 	1.0, 1.0, 0.0,
 	1.0, 1.0, 1.0
     };
-// 绘制正方体的六个面
-// 正面用逆时针绘制
+// draw the six faces of the boundbox by drawwing triangles
+// draw it contra-clockwise
 // front: 1 5 7 3
 // back: 0 2 6 4
 // left：0 1 3 2
@@ -241,10 +241,10 @@ GLuint createShaderPgm()
 }
 
 
-// 初始化1D纹理对象，用作传输函数
+// init the 1 dimentional texture for transfer function
 GLuint initTFF1DTex(const char* filename)
 {
-    // 读入传输函数
+    // read in the user defined data of transfer function
     ifstream inFile(filename, ifstream::in);
         if (!inFile)
     {
@@ -280,7 +280,7 @@ GLuint initTFF1DTex(const char* filename)
     free(tff);    
     return tff1DTex;
 }
-// 初始化2D纹理对象
+// init the 2D texture for render backface 'bf' stands for backface
 GLuint initFace2DTex(GLuint bfTexWidth, GLuint bfTexHeight)
 {
     GLuint backFace2DTex;
@@ -293,7 +293,7 @@ GLuint initFace2DTex(GLuint bfTexWidth, GLuint bfTexHeight)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, bfTexWidth, bfTexHeight, 0, GL_RGBA, GL_FLOAT, NULL);
     return backFace2DTex;
 }
-// init 3D texture
+// init 3D texture to store the volume data used fo ray casting
 GLuint initVol3DTex(const char* filename, GLuint w, GLuint h, GLuint d)
 {
     
@@ -324,12 +324,11 @@ GLuint initVol3DTex(const char* filename, GLuint w, GLuint h, GLuint d)
     // bind 3D texture target
     glBindTexture(GL_TEXTURE_3D, g_volTexObj);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);	
-// 启用三线性过滤，以得到更加清晰的图像
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-    // 注意该处涉及到像素传输
+    // pixel transfer happens here from client to OpenGL server
     glPixelStorei(GL_UNPACK_ALIGNMENT,1);
     glTexImage3D(GL_TEXTURE_3D, 0, GL_INTENSITY, w, h, d, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE,data);
 
@@ -347,7 +346,7 @@ void checkFramebufferStatus()
 	exit(EXIT_FAILURE);
     }
 }
-// 初始化framebuffer
+// init the framebuffer, the only framebuffer used in this program
 void initFrameBuffer(GLuint texObj, GLuint texWidth, GLuint texHeight)
 {
     // create a depth buffer for our framebuffer
@@ -367,10 +366,12 @@ void initFrameBuffer(GLuint texObj, GLuint texWidth, GLuint texHeight)
 
 void rcSetUinforms()
 {
-    // setting the screensize
-    // 设置步长
-    // 背面纹理
-    // 体纹理
+    // setting uniforms such as
+    // ScreenSize 
+    // StepSize
+    // TransferFunc
+    // ExitPoints i.e. the backface, the backface hold the ExitPoints of ray casting
+    // VolumeTex the texture that hold the volume data i.e. head256.raw
     GLint screenSizeLoc = glGetUniformLocation(g_programHandle, "ScreenSize");
     if (screenSizeLoc >= 0)
     {
@@ -438,20 +439,23 @@ void rcSetUinforms()
     }
     
 }
-// 初始化着色器程序
+// init the shader object and shader program
 void initShader()
 {
-// 初始化顶点着色器
+// vertex shader object for first pass
     g_bfVertHandle = initShaderObj("shader/backface.vert", GL_VERTEX_SHADER);
-// 初始化片段着色器
+// fragment shader object for first pass
     g_bfFragHandle = initShaderObj("shader/backface.frag", GL_FRAGMENT_SHADER);
+// vertex shader object for second pass
     g_rcVertHandle = initShaderObj("shader/raycasting.vert", GL_VERTEX_SHADER);
+// fragment shader object for second pass
     g_rcFragHandle = initShaderObj("shader/raycasting.frag", GL_FRAGMENT_SHADER);
-// 初始化着色器程序, use it in an appropriate time
+// create the shader program , use it in an appropriate time
     g_programHandle = createShaderPgm();
 // 获得由着色器编译器分配的索引(可选)
 }
 
+// link the shader objects using the shader program
 void linkShader(GLuint shaderPgm, GLuint newVertHandle, GLuint newFragHandle)
 {
     const GLsizei maxCount = 2;
@@ -481,13 +485,28 @@ void linkShader(GLuint shaderPgm, GLuint newVertHandle, GLuint newFragHandle)
     GL_ERROR();
 }
 
+// the color of the vertex in the back face is also the location
+// of the vertex
+// save the back face to the user defined framebuffer bound
+// with a 2D texture named `g_bfTexObj`
+// draw the front face of the box
+// in the rendering process, i.e. the ray marching process
+// loading the volume `g_volTexObj` as well as the `g_bfTexObj`
+// after vertex shader processing we got the color as well as the location of
+// the vertex (in the object coordinates, before transformation).
+// and the vertex assemblied into primitives before entering
+// fragment shader processing stage.
+// in fragment shader processing stage. we got `g_bfTexObj`
+// (correspond to 'VolumeTex' in glsl)and `g_volTexObj`(correspond to 'ExitPoints')
+// as well as the location of primitives.
+// the most important is that we got the GLSL to exec the logic. Here we go!
+// draw the back face of the box
 void display()
 {
     glEnable(GL_DEPTH_TEST);
     // test the gl_error
-    checkForOpenGLError(__FILE__, __LINE__);
+    GL_ERROR();
     // render to texture
-    // 该处是否需要像素传输？
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, g_frameBuffer);
     glViewport(0, 0, g_winWidth, g_winHeight);
     linkShader(g_programHandle, g_bfVertHandle, g_bfFragHandle);
@@ -496,31 +515,31 @@ void display()
     render(GL_FRONT);
     glUseProgram(0);
     GL_ERROR();
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, g_winWidth, g_winHeight);
     linkShader(g_programHandle, g_rcVertHandle, g_rcFragHandle);
     GL_ERROR();
     glUseProgram(g_programHandle);
     rcSetUinforms();
     GL_ERROR();
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, g_winWidth, g_winHeight);
-    glUseProgram(g_programHandle);
+    // glUseProgram(g_programHandle);
     // cull back face
     render(GL_BACK);
-    // 恢复使用单个纹理
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glDisable(GL_TEXTURE_2D);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_3D, 0);    
-    glDisable(GL_TEXTURE_3D);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_1D, 0);    
-    glDisable(GL_TEXTURE_1D);
-    glActiveTexture(GL_TEXTURE0);
+    // need or need not to resume the state of only one active texture unit?
+    // glActiveTexture(GL_TEXTURE1);
+    // glBindTexture(GL_TEXTURE_2D, 0);
+    // glDisable(GL_TEXTURE_2D);
+    // glActiveTexture(GL_TEXTURE2);
+    // glBindTexture(GL_TEXTURE_3D, 0);    
+    // glDisable(GL_TEXTURE_3D);
+    // glActiveTexture(GL_TEXTURE0);
+    // glBindTexture(GL_TEXTURE_1D, 0);    
+    // glDisable(GL_TEXTURE_1D);
+    // glActiveTexture(GL_TEXTURE0);
     glUseProgram(0);
     GL_ERROR(); 
     
-    // // for test
+    // // for test the first pass
     // glBindFramebuffer(GL_READ_FRAMEBUFFER, g_frameBuffer);
     // checkFramebufferStatus();
     // glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
@@ -534,9 +553,11 @@ void display()
     // GL_ERROR();
     glutSwapBuffers();
 }
-// 如何设计两次都使用render？
-// 第一次渲染正方体的背面
-// 第二次渲染正方体的前面， 使用不一样的着色器程序，其余相同？
+// both of the two pass use the "render() function"
+// the first pass render the backface of the boundbox
+// the second pass render the frontface of the boundbox
+// together with the frontface, use the backface as a 2D texture in the second pass
+// to calculate the entry point and the exit point of the ray in and out the box.
 void render(GLenum cullFace)
 {
     GL_ERROR();
@@ -549,6 +570,8 @@ void render(GLenum cullFace)
     				 glm::vec3(0.0f, 1.0f, 0.0f));
     glm::mat4 model = mat4(1.0f);
     model *= glm::rotate((float)g_angle, glm::vec3(0.0f, 1.0f, 0.0f));
+    // to make the "head256.raw" i.e. the volume data stand up.
+    model *= glm::rotate(90.0f, vec3(1.0f, 0.0f, 0.0f));
     model *= glm::translate(glm::vec3(-0.5f, -0.5f, -0.5f)); 
     // notice the multiplication order: reverse order of transform
     glm::mat4 mvp = projection * view * model;
@@ -561,19 +584,6 @@ void render(GLenum cullFace)
     {
     	cerr << "can't get the MVP" << endl;
     }
-    // draw the back face of the box
-    // the color of the vertex in the back face is also the location
-    // of the vertex
-    // save the back face to the user defined framebuffer bound
-    // with a 2D texture named `backFace`
-    // draw the front face of the box
-    // in the rendering process, loading the volume `vol` as well as the `backFace`
-    // after vertex shader processing we got the color as well as the location of
-    // the vertex. and the vertex assemblied into primitives before entering
-    // fragment shader processing stage.
-    // in fragment shader processing stage. we got `vol` adn `backFace` as well as
-    // the location of primitives. the most important is that we got the GLSL to
-    // exec the logic. Here we go! 
     GL_ERROR();
     drawBox(cullFace);
     GL_ERROR();
@@ -591,13 +601,24 @@ void reshape(int w, int h)
     g_texWidth = w;
     g_texHeight = h;
 }
+
+void keyboard(unsigned char key, int x, int y)
+{
+    switch (key)
+    {
+    case '\x1B':
+	exit(EXIT_SUCCESS);
+	break;
+    }
+}
+
 int main(int argc, char** argv)
 {
     
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
-    glutCreateWindow("GLUT Test");
     glutInitWindowSize(400, 400);
+    glutCreateWindow("GLUT Test");
     GLenum err = glewInit();
     if (GLEW_OK != err)
     {
@@ -613,12 +634,4 @@ int main(int argc, char** argv)
     glutMainLoop();
     return EXIT_SUCCESS;
 }
-void keyboard(unsigned char key, int x, int y)
-{
-    switch (key)
-    {
-    case '\x1B':
-	exit(EXIT_SUCCESS);
-	break;
-    }
-}
+
