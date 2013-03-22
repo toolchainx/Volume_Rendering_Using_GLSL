@@ -15,3 +15,6 @@
 - [Acceleration Techniques for GPU-based Volume Rendering](http://cglab.snu.ac.kr/lectures/05-2/graphics/notes/papers/Acceleration%20Techniques%20for%20GPU.pdf)
 - [Raycasting tutorial](http://www.voreen.org/129-Ray-Casting.html)
 - [A simple and flexible volume rendering framework for graphics-hardware-based raycasting](http://dl.acm.org/citation.cfm?id=2386498)
+
+## Volume Data Source ##
+- [The Stanford volume data archive](http://www-graphics.stanford.edu/data/voldata/)
