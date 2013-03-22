@@ -7,9 +7,7 @@
 - dependencies: OpenGL4.0 and newer version, [glew](http://glew.sourceforge.net/), [freeglut](http://freeglut.sourceforge.net/) and [glm](http://glm.g-truc.net/ ), already included in this repo. If there is something wrong, maybe you need to compile the libs yourself.
 - It is a two pass solution of the Raycasting algorithm.
 - ![](http://www.voreen.org//files/ray_raycasting_general.jpg)
-
-\includegraphics[keepaspectratio,width=\textwidth, height=.8\textheight]{http://www.voreen.org//files/ray_entry_exit.jpg} 
-
+- ![](ray_entry_exit.jpg)
 - just `make` in the command line to compile it.
 
 
