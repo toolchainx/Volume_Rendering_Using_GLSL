@@ -7,8 +7,12 @@
 - dependencies: OpenGL4.0 and newer version, [glew](http://glew.sourceforge.net/), [freeglut](http://freeglut.sourceforge.net/) and [glm](http://glm.g-truc.net/ ), already included in this repo. If there is something wrong, maybe you need to compile the libs yourself.
 - It is a two pass solution of the Raycasting algorithm.
 - ![](http://www.voreen.org//files/ray_raycasting_general.jpg)
-- \includegraphics[keepaspectratio,width=\textwidth, height=.8\textheight]{http://www.voreen.org//files/ray_entry_exit.jpg} 
+
+\includegraphics[keepaspectratio,width=\textwidth, height=.8\textheight]{http://www.voreen.org//files/ray_entry_exit.jpg} 
+
 - just `make` in the command line to compile it.
+
+
 ## references: ##
 - [Acceleration Techniques for GPU-based Volume Rendering](http://cglab.snu.ac.kr/lectures/05-2/graphics/notes/papers/Acceleration%20Techniques%20for%20GPU.pdf)
 - [Raycasting tutorial](http://www.voreen.org/129-Ray-Casting.html)
